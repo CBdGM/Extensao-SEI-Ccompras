@@ -54,8 +54,7 @@ Este projeto resolve esse problema com dois componentes:
 | Componente | Tecnologia | Descrição |
 |-----------|-----------|-----------|
 | **backend/** | Python 3.12 + FastAPI | API REST, lógica de negócio, integração SOAP com SEI |
-| **frontend/** | React 18 + Vite + TypeScript | Painel web completo para gestão |
-| **extension/** | Chrome Extension MV3 + TypeScript | Painel lateral integrado ao SEI |
+| **extension/** | Chrome Extension MV3 + TypeScript | Painel lateral integrado ao SEI — interface principal do MVP |
 
 ---
 
@@ -90,15 +89,6 @@ Este projeto resolve esse problema com dois componentes:
     audit)        PDFs)
 ```
 
-```
-┌────────────────────────────────────────────────┐
-│  Frontend web (React) — http://localhost        │
-│  Painel admin: processos, artefatos,            │
-│  comprovantes, auditoria, configuração SEI      │
-└──────────────────────┬─────────────────────────┘
-                       │ HTTP/JSON (JWT Bearer)
-               FastAPI /api/v1/*
-```
 
 ### Camadas do backend
 
@@ -142,11 +132,13 @@ sidebar.ts            ← Painel lateral completo (tabs: Processo, Importar,
 
 **Para desenvolvimento local:**
 - Python 3.12+
-- Node.js 20+
-- PostgreSQL 16
+- PostgreSQL 16 (ou Docker apenas para o banco)
 
 **Para a extensão:**
 - Chrome 102+ ou Microsoft Edge 102+
+
+**Para recompilar a extensão (opcional):**
+- Node.js 20+ (a extensão já vem pré-compilada em `extension/dist/`)
 
 ---
 
@@ -167,7 +159,7 @@ python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(64))"
 python3 -c "from cryptography.fernet import Fernet; print('ENCRYPTION_KEY=' + Fernet.generate_key().decode())"
 # Cole os valores gerados no .env
 
-# Suba todos os serviços
+# Suba o banco e o backend
 docker compose up -d --build
 
 # Execute as migrations do banco
@@ -178,7 +170,6 @@ docker exec compras_sei_backend python seed.py
 ```
 
 Acesse:
-- **Frontend:** http://localhost
 - **Backend API:** http://localhost:8000/api/health
 - **Swagger (apenas DEBUG=true):** http://localhost:8000/api/docs
 
@@ -213,15 +204,6 @@ python seed.py
 
 # Inicie o servidor com hot reload
 uvicorn app.main:app --reload --port 8000
-```
-
-#### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-# Acesse: http://localhost:5173
 ```
 
 ---
@@ -282,7 +264,7 @@ Copie `.env.example` para `.env` e preencha. Variáveis obrigatórias:
 | `SECRET_KEY` | Chave de assinatura JWT | `python3 -c "import secrets; print(secrets.token_urlsafe(64))"` |
 | `ENCRYPTION_KEY` | Chave Fernet para credenciais SEI | `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `POSTGRES_PASSWORD` | Senha do banco de dados | Defina livremente |
-| `ALLOWED_ORIGINS` | Origens CORS permitidas (separadas por vírgula) | Ex: `http://localhost,http://localhost:5173` |
+| `ALLOWED_ORIGINS` | Origens CORS permitidas (separadas por vírgula) | Ex: `http://localhost` |
 
 Variáveis para ativar escrita no SEI:
 
@@ -488,17 +470,6 @@ MVP_EXTENSAO/
 │   ├── alembic.ini
 │   └── Dockerfile
 │
-├── frontend/                         # React 18 + Vite + TypeScript + Tailwind
-│   ├── src/
-│   │   ├── pages/                    # Login, ProcessDetail, Documents, Artifacts,
-│   │   │   │                         #   AuditLogs, SEIConfig, Dashboard
-│   │   ├── components/Layout/        # Sidebar + Header
-│   │   ├── lib/api.ts                # Axios + interceptors JWT/refresh
-│   │   ├── store/authStore.ts        # Zustand
-│   │   └── types/index.ts
-│   ├── nginx.conf
-│   └── Dockerfile
-│
 ├── extension/                        # Chrome/Edge Extension MV3
 │   ├── dist/                         # Build pré-compilado — carregar direto no Chrome
 │   ├── public/
@@ -591,7 +562,6 @@ open htmlcov/index.html
 | SOAP | httpx async (sem lib SOAP pesada) |
 | PDF | ReportLab |
 | Rate limiting | slowapi |
-| Frontend | React 18 + Vite + TypeScript + Tailwind CSS + Zustand + TanStack Query |
 | Extensão | Chrome Extension MV3 + TypeScript + Vite |
 | Containerização | Docker + Docker Compose v2 |
 

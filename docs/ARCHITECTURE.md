@@ -13,10 +13,7 @@
 | SOAP | httpx async | Sem dependência de biblioteca SOAP pesada |
 | PDF | ReportLab | Sem dependências de sistema (ex: weasyprint requer libcairo) |
 | Rate limit | slowapi | Integração nativa com FastAPI |
-| Frontend | React + Vite + TypeScript | Tipagem estrita, build rápido |
-| Estado | Zustand | Minimal, sem boilerplate Redux |
-| Queries | TanStack React Query | Cache, retry, invalidação declarativa |
-| CSS | Tailwind CSS | Utilitário, sem CSS-in-JS overhead |
+| Extensão | Chrome Extension MV3 + TypeScript + Vite | Interface principal do MVP |
 
 ---
 
@@ -38,7 +35,7 @@ Usuário Admin → Painel → identificacao_servico (plaintext)
 A chave **nunca**:
 - É retornada por qualquer endpoint de API
 - É registrada em logs
-- É exposta no frontend
+- É exposta ao cliente (extensão ou qualquer consumidor da API)
 
 ### Fluxo de autenticação
 ```
