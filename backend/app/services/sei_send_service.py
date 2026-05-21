@@ -258,25 +258,21 @@ async def send_document_to_sei(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento não encontrado")
 
     if document.send_to_sei_status == DocSendStatus.SENT:
-        # If content changed after sending, block and signal needs_reissue
+        # If content changed after sending, allow re-send by resetting the status
         if document.status and document.status.value in ("needs_reissue", "needs_update"):
+            document.send_to_sei_status = DocSendStatus.NOT_SENT
+            document.sei_document_number = None
+            document.sei_document_id_legacy = None
+            await db.flush()
+        else:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    "O documento de comprovação já foi enviado ao SEI e possui alterações pendentes "
-                    f"(documento {document.sei_document_number}). "
-                    "Utilize o endpoint /reissue-to-sei para criar uma nova versão, ou atualize o "
-                    "conteúdo via /rebuild e confirme o reenvio."
+                    f"Documento já enviado ao SEI "
+                    f"(documento {document.sei_document_number or document.sei_document_id_legacy}). "
+                    "Se precisar reenviar, regenere o comprovante primeiro para criar uma nova versão."
                 ),
             )
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"Documento já enviado ao SEI "
-                f"(documento {document.sei_document_number or document.sei_document_id_legacy}). "
-                "Para reenviar, contate um administrador."
-            ),
-        )
 
     if not document.document_html:
         raise HTTPException(

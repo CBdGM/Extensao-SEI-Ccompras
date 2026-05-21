@@ -128,7 +128,7 @@ async function tryAutoQuery() {
   const numInput = el<HTMLInputElement>("input-numero-processo");
   if (numInput) numInput.value = numeroProcesso;
 
-  // Fast path: load from cache immediately, then refresh from SEI in background
+  // Fast path 1: load from chrome.storage cache (survives service worker restarts)
   const cached = await sendToBackground<{ ok: boolean; data: ProcessRecord | null }>(
     "GET_CACHED_PROCESS", { numeroProcesso }
   );
@@ -137,12 +137,32 @@ async function tryAutoQuery() {
     renderProcess();
     const pidField = el<HTMLInputElement>("import-process-id");
     if (pidField) pidField.value = state.process.id;
-    // Load artifacts and document from DB right away (no SOAP needed)
+    await Promise.all([loadArtifacts(), loadDocument()]);
+    // Background SOAP refresh to keep process data current
+    consultarProcesso().catch(() => {});
+    return;
+  }
+
+  // Fast path 2: load from DB without SOAP (instant, works even when SEI is unreachable)
+  const dbRes = await api<ProcessRecord[]>(
+    "GET",
+    `/sei-processes/?numero_processo=${encodeURIComponent(numeroProcesso)}&limit=1`
+  );
+  if (dbRes.ok && dbRes.data && dbRes.data.length > 0) {
+    state.process = dbRes.data[0];
+    renderProcess();
+    const pidField = el<HTMLInputElement>("import-process-id");
+    if (pidField) pidField.value = state.process.id;
+    // Warm the cache so next refresh hits fast path 1
+    sendToBackground("CACHE_PROCESS", {
+      numeroProcesso,
+      processData: state.process,
+    });
     await Promise.all([loadArtifacts(), loadDocument()]);
   }
 
-  // Refresh from SEI in background (updates process data and ensures process exists in DB)
-  consultarProcesso().catch(() => {/* silent — cached data already shown */});
+  // Background SOAP refresh (always — creates process in DB if new, refreshes data)
+  consultarProcesso().catch(() => {});
 }
 
 // ──────────────────────────────────────────────
@@ -295,11 +315,17 @@ async function consultarProcesso() {
   const pidField = el<HTMLInputElement>("import-process-id");
   if (pidField) pidField.value = state.process.id;
 
-  // Cache process for instant reload next time
+  // Cache process under the normalized number AND the raw input (handles SEI format variations)
   sendToBackground("CACHE_PROCESS", {
     numeroProcesso: state.process.numero_processo,
     processData: state.process,
   });
+  if (numeroProcesso !== state.process.numero_processo) {
+    sendToBackground("CACHE_PROCESS", {
+      numeroProcesso,
+      processData: state.process,
+    });
+  }
 
   // Load related data
   loadArtifacts();
@@ -564,7 +590,7 @@ function renderDocument() {
   const d = state.document;
   const docLabel: Record<string, string> = {
     not_generated: "Não gerado", generating: "Gerando",
-    generated: "Gerado", error: "Erro",
+    generated: "Gerado", error: "Erro", needs_reissue: "Reemissão necessária",
   };
   const seiLabel: Record<string, string> = {
     not_sent: "Não enviado", pending: "Pendente",
@@ -586,8 +612,8 @@ function renderDocument() {
         </svg>
         Visualizar
       </button>
-      ${d.send_to_sei_status === "not_sent" || d.send_to_sei_status === "error" || d.send_to_sei_status === "file_uploaded_document_failed"
-        ? `<button class="btn btn-primary btn-sm" id="btn-enviar-comprov">Enviar ao SEI</button>`
+      ${d.send_to_sei_status === "not_sent" || d.send_to_sei_status === "error" || d.send_to_sei_status === "file_uploaded_document_failed" || d.status === "needs_reissue"
+        ? `<button class="btn btn-primary btn-sm" id="btn-enviar-comprov">${d.status === "needs_reissue" ? "Reenviar ao SEI" : "Enviar ao SEI"}</button>`
         : ""}
     </div>
   `;

@@ -144,13 +144,12 @@ async def list_processes(
     current_user: User = Depends(get_current_user),
     skip: int = 0,
     limit: int = 50,
+    numero_processo: str | None = None,
 ):
-    result = await db.execute(
-        select(SEIProcess)
-        .order_by(SEIProcess.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-    )
+    q = select(SEIProcess).order_by(SEIProcess.created_at.desc())
+    if numero_processo:
+        q = q.where(SEIProcess.numero_processo == numero_processo)
+    result = await db.execute(q.offset(skip).limit(limit))
     processes = result.scalars().all()
 
     items = []

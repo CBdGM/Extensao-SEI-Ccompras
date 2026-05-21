@@ -63,6 +63,24 @@ async function tryAutoQuery() {
     const pidField = el("import-process-id");
     if (pidField) pidField.value = state.process.id;
     await Promise.all([loadArtifacts(), loadDocument()]);
+    consultarProcesso().catch(() => {
+    });
+    return;
+  }
+  const dbRes = await api(
+    "GET",
+    `/sei-processes/?numero_processo=${encodeURIComponent(numeroProcesso)}&limit=1`
+  );
+  if (dbRes.ok && dbRes.data && dbRes.data.length > 0) {
+    state.process = dbRes.data[0];
+    renderProcess();
+    const pidField = el("import-process-id");
+    if (pidField) pidField.value = state.process.id;
+    sendToBackground("CACHE_PROCESS", {
+      numeroProcesso,
+      processData: state.process
+    });
+    await Promise.all([loadArtifacts(), loadDocument()]);
   }
   consultarProcesso().catch(() => {
   });
@@ -181,6 +199,12 @@ async function consultarProcesso() {
     numeroProcesso: state.process.numero_processo,
     processData: state.process
   });
+  if (numeroProcesso !== state.process.numero_processo) {
+    sendToBackground("CACHE_PROCESS", {
+      numeroProcesso,
+      processData: state.process
+    });
+  }
   loadArtifacts();
   loadDocument();
 }
@@ -443,7 +467,8 @@ function renderDocument() {
     not_generated: "Não gerado",
     generating: "Gerando",
     generated: "Gerado",
-    error: "Erro"
+    error: "Erro",
+    needs_reissue: "Reemissão necessária"
   };
   const seiLabel = {
     not_sent: "Não enviado",
@@ -467,7 +492,7 @@ function renderDocument() {
         </svg>
         Visualizar
       </button>
-      ${d.send_to_sei_status === "not_sent" || d.send_to_sei_status === "error" || d.send_to_sei_status === "file_uploaded_document_failed" ? `<button class="btn btn-primary btn-sm" id="btn-enviar-comprov">Enviar ao SEI</button>` : ""}
+      ${d.send_to_sei_status === "not_sent" || d.send_to_sei_status === "error" || d.send_to_sei_status === "file_uploaded_document_failed" || d.status === "needs_reissue" ? `<button class="btn btn-primary btn-sm" id="btn-enviar-comprov">${d.status === "needs_reissue" ? "Reenviar ao SEI" : "Enviar ao SEI"}</button>` : ""}
     </div>
   `;
   el("btn-regenerar")?.addEventListener("click", gerarComprovacao);
