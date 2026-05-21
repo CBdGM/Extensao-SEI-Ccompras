@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "Integração Compras-SEI",
+  "version": "1.0.0",
+  "description": "Camada de usabilidade para integração entre Compras.gov.br e SEI/IFPE",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    },
+    "default_title": "Integração Compras-SEI"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://sei-testes.ifpe.edu.br/*",
+        "https://sei.ifpe.edu.br/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "type": "module"
+    }
+  ],
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://sei-testes.ifpe.edu.br/*",
+    "https://sei.ifpe.edu.br/*",
+    "http://localhost:8000/*",
+    "https://localhost:8000/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["sidebar.html", "icons/*", "chunks/*"],
+      "matches": [
+        "https://sei-testes.ifpe.edu.br/*",
+        "https://sei.ifpe.edu.br/*"
+      ]
+    }
+  ]
+}

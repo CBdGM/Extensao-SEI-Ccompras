@@ -1,0 +1,19 @@
+{
+  "name": "compras-sei-extension",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Extensão Chrome/Edge para integração Compras.gov.br - SEI/IFPE",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "build:prod": "NODE_ENV=production vite build",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.278",
+    "@types/node": "^20.12.12",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11"
+  }
+}

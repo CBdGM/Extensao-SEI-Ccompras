@@ -1,0 +1,75 @@
+/*
+  All selectors are namespaced under .compras-sei-* to avoid
+  colliding with SEI's own stylesheet.
+*/
+
+/* ── Inject button — fixed floating so DOM placement doesn't matter ── */
+#compras-sei-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  /* Fixed bottom-right so it's visible regardless of where it's in the DOM */
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 99998;
+  box-shadow: 0 4px 12px rgba(26,86,219,.45);
+  transition: background 0.15s, box-shadow 0.15s;
+}
+#compras-sei-btn:hover {
+  background: #1e40af;
+  box-shadow: 0 6px 16px rgba(26,86,219,.55);
+}
+#compras-sei-btn svg {
+  flex-shrink: 0;
+}
+
+/* ── Sidebar wrapper ── */
+.compras-sei-sidebar-wrapper {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  height: 100vh;
+  background: #fff;
+  border-left: 2px solid #1a56db;
+  box-shadow: -4px 0 16px rgba(0,0,0,.15);
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.compras-sei-sidebar-close {
+  position: absolute;
+  top: 8px;
+  left: -36px;
+  width: 30px;
+  height: 30px;
+  background: #1a56db;
+  color: #fff;
+  border: none;
+  border-radius: 4px 0 0 4px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+}
+
+.compras-sei-sidebar-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  flex: 1;
+}

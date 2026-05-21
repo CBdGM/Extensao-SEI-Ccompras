@@ -1,0 +1,40 @@
+# ─── Segredos — NUNCA commitar ────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+backend/dist/
+backend/build/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ─── Node ─────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+# extension/dist/ é commitado intencionalmente para facilitar a instalação
+
+# ─── Uploads e arquivos gerados ───────────────────────────────
+uploads/
+*.pdf
+
+# ─── SO ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── IDE ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+
+# ─── Docker / logs ────────────────────────────────────────────
+*.log

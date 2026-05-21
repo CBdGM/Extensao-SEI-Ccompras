@@ -1,0 +1,80 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: compras_sei_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-compras_sei}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-compras_sei_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-compras_sei}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # External port 5433 to avoid conflict
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compras_sei -d compras_sei"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: compras_sei_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-compras_sei}:${POSTGRES_PASSWORD:-compras_sei_pass}@db:5432/${POSTGRES_DB:-compras_sei}
+      SECRET_KEY: ${SECRET_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEBUG: ${DEBUG:-false}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost}
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-20}
+      SEI_ENABLE_WRITE_OPERATIONS: ${SEI_ENABLE_WRITE_OPERATIONS:-false}
+      SEI_SOAP_URL: ${SEI_SOAP_URL:-}
+      SEI_SIGLA_SISTEMA: ${SEI_SIGLA_SISTEMA:-}
+      SEI_IDENTIFICACAO_SERVICO: ${SEI_IDENTIFICACAO_SERVICO:-}
+      SEI_ID_UNIDADE_DEFAULT: ${SEI_ID_UNIDADE_DEFAULT:-}
+      SEI_WRITE_TIMEOUT_SECONDS: ${SEI_WRITE_TIMEOUT_SECONDS:-30}
+      SEI_DEFAULT_EXTERNAL_DOCUMENT_SERIES_ID: ${SEI_DEFAULT_EXTERNAL_DOCUMENT_SERIES_ID:-}
+      SEI_DEFAULT_CONFIRMATION_DOCUMENT_SERIES_ID: ${SEI_DEFAULT_CONFIRMATION_DOCUMENT_SERIES_ID:-}
+      SEI_DEFAULT_TIPO_CONFERENCIA_ID: ${SEI_DEFAULT_TIPO_CONFERENCIA_ID:-}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-60}
+      RATE_LIMIT_LOGIN_PER_MINUTE: ${RATE_LIMIT_LOGIN_PER_MINUTE:-10}
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: compras_sei_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  uploads_data:
+    driver: local

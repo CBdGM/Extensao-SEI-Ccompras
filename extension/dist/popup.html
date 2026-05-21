@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compras-SEI</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body class="popup-body">
+  <div class="popup-header">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+    </svg>
+    <strong>Compras-SEI</strong>
+    <span id="auth-status" class="popup-badge popup-badge-off">—</span>
+  </div>
+
+  <div class="popup-content">
+    <p id="page-status" class="popup-hint">Acesse uma tela de processo no SEI para usar a integração.</p>
+
+    <button id="btn-open-sidebar" class="popup-btn popup-btn-primary" style="display:none">
+      Abrir painel de integração
+    </button>
+
+    <hr class="popup-divider" />
+
+    <button id="btn-open-middleware" class="popup-btn popup-btn-secondary">
+      Abrir Middleware
+    </button>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

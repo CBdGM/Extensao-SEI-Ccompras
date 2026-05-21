@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Integração Compras-SEI</title>
+  <link rel="stylesheet" href="sidebar.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="sidebar-header">
+    <div class="header-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+      </svg>
+      <span>Compras-SEI</span>
+    </div>
+    <div class="header-right">
+      <span id="auth-badge" class="auth-badge auth-off">Desconectado</span>
+      <button id="btn-logout" class="btn btn-ghost btn-sm" style="display:none">Sair</button>
+    </div>
+  </header>
+
+  <!-- SEI context chip -->
+  <div class="sei-context-bar">
+    <span class="sei-context-label">Processo:</span>
+    <span id="sei-numero" class="sei-context-value">—</span>
+    <span id="sei-url" class="sei-context-id"></span>
+  </div>
+
+  <!-- Error banner -->
+  <div id="error-banner" class="error-banner" style="display:none"></div>
+
+  <!-- Spinner overlay -->
+  <div id="spinner" class="spinner-overlay" style="display:none">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Login section -->
+  <div id="login-section" class="login-section">
+    <p class="login-hint">Autentique-se no middleware para usar a integração.</p>
+    <form id="login-form" class="login-form" autocomplete="off">
+      <label for="input-email">E-mail</label>
+      <input id="input-email" type="email" placeholder="usuario@ifpe.edu.br" autocomplete="email" required />
+      <label for="input-password">Senha</label>
+      <input id="input-password" type="password" placeholder="••••••••" autocomplete="current-password" required />
+      <button type="submit" class="btn btn-primary">Entrar</button>
+    </form>
+  </div>
+
+  <!-- Tabs -->
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-tab="processo">Processo</button>
+    <button class="tab-btn" data-tab="importar">Importar</button>
+    <button class="tab-btn" data-tab="comprovacao">Comprovação</button>
+    <button class="tab-btn" data-tab="historico">Histórico</button>
+    <button class="tab-btn" data-tab="config">Config</button>
+  </nav>
+
+  <!-- ── Tab: Processo ── -->
+  <section id="panel-processo" class="tab-panel">
+    <div class="panel-actions">
+      <label for="input-numero-processo" class="field-label">Número do processo</label>
+      <div class="input-row">
+        <input id="input-numero-processo" type="text"
+          placeholder="23038.000001/2024-01"
+          class="field-input" />
+        <button id="btn-consultar" class="btn btn-primary btn-sm">Consultar</button>
+      </div>
+    </div>
+    <div id="processo-info">
+      <p class="empty-state">Informe o número do processo e clique em "Consultar".</p>
+    </div>
+  </section>
+
+  <!-- ── Tab: Importar ── -->
+  <section id="panel-importar" class="tab-panel" style="display:none">
+    <form id="import-form" class="import-form">
+      <input type="hidden" id="import-process-id" />
+
+      <label for="import-file">Arquivo</label>
+      <input id="import-file" type="file" accept="*/*" required />
+
+      <label for="import-tipo">Tipo de artefato</label>
+      <select id="import-tipo" class="field-select" required>
+        <option value="DFD">DFD</option>
+        <option value="ETP">ETP</option>
+        <option value="TR">Termo de Referência</option>
+        <option value="MATRIZ_RISCOS">Matriz de Riscos</option>
+      </select>
+
+      <label for="import-compras-id">Identificador Compras.gov.br</label>
+      <input id="import-compras-id" type="text" placeholder="Ex: PE-00123/2024" required />
+
+      <label for="import-nivel">Nível de acesso</label>
+      <select id="import-nivel" class="field-select" required>
+        <option value="publico">Público</option>
+        <option value="restrito">Restrito</option>
+        <option value="sigiloso">Sigiloso</option>
+      </select>
+
+      <label for="import-obs">Observação (opcional)</label>
+      <input id="import-obs" type="text" placeholder="Observação sobre o artefato" />
+
+      <button type="submit" class="btn btn-primary btn-sm">Enviar ao middleware</button>
+    </form>
+
+    <h3 class="section-title">Artefatos importados</h3>
+    <div id="artefatos-list">
+      <p class="empty-state">Consulte o processo primeiro.</p>
+    </div>
+  </section>
+
+  <!-- ── Tab: Comprovação ── -->
+  <section id="panel-comprovacao" class="tab-panel" style="display:none">
+    <h3 class="section-title">Documento de Comprovação</h3>
+    <div id="comprovacao-info">
+      <p class="empty-state">Consulte o processo primeiro.</p>
+    </div>
+  </section>
+
+  <!-- ── Tab: Histórico ── -->
+  <section id="panel-historico" class="tab-panel" style="display:none">
+    <h3 class="section-title">Trilha de Auditoria</h3>
+    <div id="historico-list">
+      <p class="empty-state">Consulte o processo primeiro.</p>
+    </div>
+  </section>
+
+  <!-- ── Tab: Config ── -->
+  <section id="panel-config" class="tab-panel" style="display:none">
+    <form id="config-form" class="config-form">
+      <label for="config-middleware-url">URL do Middleware (API)</label>
+      <input id="config-middleware-url" type="url" placeholder="http://localhost:8000" required />
+      <label for="config-frontend-url">URL do Frontend</label>
+      <input id="config-frontend-url" type="url" placeholder="http://localhost:5173" required />
+      <label for="config-sei-series-id">ID Série SEI (docs externos)</label>
+      <input id="config-sei-series-id" type="text" placeholder="Ex: 6" />
+      <div class="config-actions">
+        <button type="submit" class="btn btn-primary btn-sm">Salvar</button>
+        <span id="config-saved" style="display:none; color:var(--color-success); font-size:.8rem">Salvo!</span>
+      </div>
+    </form>
+    <hr class="divider" />
+    <div class="config-section">
+      <p class="config-hint">Abrir o frontend em janela completa:</p>
+      <button id="btn-open-full" class="btn btn-secondary btn-sm">Abrir Frontend</button>
+    </div>
+  </section>
+
+  <script src="sidebar.js" type="module"></script>
+</body>
+</html>
