@@ -97,6 +97,15 @@ interface DocumentRecord {
   last_rebuilt_at?: string;
 }
 
+interface UserRecord {
+  id: string;
+  name: string;
+  email: string;
+  role: "user" | "admin";
+  is_active: boolean;
+  created_at: string;
+}
+
 interface SeiContext {
   numeroProcesso?: string;
   idProcedimento?: string;
@@ -106,13 +115,14 @@ interface SeiContext {
 const state = {
   seiContext: null as SeiContext | null,
   isAuthenticated: false,
+  userRole: null as "user" | "admin" | null,
   middlewareUrl: "http://localhost:8000",
   frontendUrl: "http://localhost:5173",
   seiExternalSeriesId: "",
   process: null as ProcessRecord | null,
   artifacts: [] as ArtifactRecord[],
   document: null as DocumentRecord | null,
-  activeTab: "processo" as "processo" | "importar" | "comprovacao" | "historico" | "config",
+  activeTab: "processo" as "processo" | "importar" | "comprovacao" | "historico" | "usuarios" | "config",
 };
 
 // Flags to coordinate auto-query: runs once both auth AND sei context are ready
@@ -207,8 +217,15 @@ async function checkAuth() {
   state.middlewareUrl = result.middlewareUrl ?? "http://localhost:8000";
   state.frontendUrl = result.frontendUrl ?? "http://localhost:5173";
   state.seiExternalSeriesId = result.seiExternalSeriesId ?? "";
+
+  if (state.isAuthenticated) {
+    const meRes = await api<UserRecord>("GET", "/users/me");
+    if (meRes.ok && meRes.data) state.userRole = meRes.data.role;
+  }
+
   _authReady = true;
   renderAuthStatus();
+  renderAdminTabs();
   await tryAutoQuery();
 }
 
@@ -248,19 +265,34 @@ async function handleLogin(e: Event) {
 
   await sendToBackground("SET_TOKEN", res.data);
   state.isAuthenticated = true;
+
+  const meRes = await api<UserRecord>("GET", "/users/me");
+  if (meRes.ok && meRes.data) state.userRole = meRes.data.role;
+
   renderAuthStatus();
+  renderAdminTabs();
 }
 
 async function handleLogout() {
   await sendToBackground("CLEAR_TOKEN");
   state.isAuthenticated = false;
+  state.userRole = null;
   state.process = null;
   state.artifacts = [];
   state.document = null;
   renderAuthStatus();
+  renderAdminTabs();
   renderProcess();
   renderArtifacts();
   renderDocument();
+}
+
+function renderAdminTabs() {
+  const isAdmin = state.userRole === "admin";
+  const historicoBtn = el("tab-btn-historico");
+  const usuariosBtn = el("tab-btn-usuarios");
+  if (historicoBtn) historicoBtn.style.display = isAdmin ? "" : "none";
+  if (usuariosBtn) usuariosBtn.style.display = isAdmin ? "" : "none";
 }
 
 // ──────────────────────────────────────────────
@@ -444,6 +476,7 @@ async function sendArtifactToSei(artifactId: string) {
   setLoading(false);
   if (!res.ok) { showError(res.error ?? "Erro ao enviar ao SEI."); return; }
   await loadArtifacts();
+  refreshSeiTree();
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -570,6 +603,15 @@ async function enviarComprovacaoSei() {
   setLoading(false);
   if (!res.ok) { showError(res.error ?? "Erro ao enviar ao SEI."); return; }
   if (res.data) { state.document = res.data; renderDocument(); }
+  refreshSeiTree();
+}
+
+function refreshSeiTree() {
+  window.parent.postMessage({ type: "REFRESH_SEI_TREE" }, "*");
+}
+
+function closeSidebarPanel() {
+  window.parent.postMessage({ type: "CLOSE_SIDEBAR" }, "*");
 }
 
 function renderDocument() {
@@ -688,6 +730,162 @@ function renderAuditLog(entries: AuditEntry[]) {
 }
 
 // ──────────────────────────────────────────────
+// Gerenciamento de usuários (admin)
+// ──────────────────────────────────────────────
+
+async function loadUsers() {
+  const res = await api<UserRecord[]>("GET", "/users/");
+  if (res.ok && res.data) renderUsers(res.data);
+}
+
+function renderUsers(users: UserRecord[]) {
+  const c = el("users-list");
+  if (!c) return;
+  if (!users.length) {
+    c.innerHTML = `<p class="empty-state">Nenhum usuário cadastrado.</p>`;
+    return;
+  }
+  c.innerHTML = users.map((u) => `
+    <div class="artefato-item">
+      <div class="artefato-nome">${u.name}</div>
+      <div class="artefato-meta">
+        <span class="tipo-pill">${u.email}</span>
+        <span class="tipo-pill">${u.role === "admin" ? "Admin" : "Usuário"}</span>
+        <span class="status-pill status-${u.is_active ? "sent" : "error"}">${u.is_active ? "Ativo" : "Inativo"}</span>
+      </div>
+      <div class="artefato-actions">
+        <button class="btn btn-sm ${u.is_active ? "btn-danger" : "btn-primary"}"
+          data-action="toggle-user" data-user-id="${u.id}" data-active="${u.is_active}">
+          ${u.is_active ? "Desativar" : "Ativar"}
+        </button>
+        <button class="btn btn-sm btn-secondary"
+          data-action="reset-password" data-user-id="${u.id}" data-user-name="${u.name}">
+          Redefinir senha
+        </button>
+      </div>
+      <div id="reset-pw-form-${u.id}" style="display:none; margin-top:8px">
+        <input type="password" id="reset-pw-new-${u.id}" placeholder="Nova senha" class="field-input" style="margin-bottom:4px;width:100%" />
+        <input type="password" id="reset-pw-confirm-${u.id}" placeholder="Confirmar senha" class="field-input" style="margin-bottom:4px;width:100%" />
+        <div id="reset-pw-error-${u.id}" class="error-inline" style="display:none"></div>
+        <button class="btn btn-primary btn-sm" data-action="confirm-reset" data-user-id="${u.id}">Confirmar</button>
+        <button class="btn btn-secondary btn-sm" data-action="cancel-reset" data-user-id="${u.id}">Cancelar</button>
+      </div>
+    </div>
+  `).join("");
+
+  c.querySelectorAll<HTMLButtonElement>('[data-action="toggle-user"]').forEach((btn) => {
+    btn.addEventListener("click", () => toggleUserActive(
+      btn.dataset.userId!,
+      btn.dataset.active !== "true",
+    ));
+  });
+
+  c.querySelectorAll<HTMLButtonElement>('[data-action="reset-password"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const form = document.getElementById(`reset-pw-form-${btn.dataset.userId}`);
+      if (form) form.style.display = form.style.display === "none" ? "block" : "none";
+    });
+  });
+
+  c.querySelectorAll<HTMLButtonElement>('[data-action="cancel-reset"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const form = document.getElementById(`reset-pw-form-${btn.dataset.userId}`);
+      if (form) form.style.display = "none";
+    });
+  });
+
+  c.querySelectorAll<HTMLButtonElement>('[data-action="confirm-reset"]').forEach((btn) => {
+    btn.addEventListener("click", () => adminResetPassword(btn.dataset.userId!));
+  });
+}
+
+async function toggleUserActive(userId: string, isActive: boolean) {
+  setLoading(true);
+  const res = await api("PATCH", `/users/${userId}`, { is_active: isActive });
+  setLoading(false);
+  if (!res.ok) { showError(res.error ?? "Erro ao atualizar usuário."); return; }
+  await loadUsers();
+}
+
+async function adminResetPassword(userId: string) {
+  const newPw = (document.getElementById(`reset-pw-new-${userId}`) as HTMLInputElement)?.value;
+  const confirm = (document.getElementById(`reset-pw-confirm-${userId}`) as HTMLInputElement)?.value;
+  const errEl = document.getElementById(`reset-pw-error-${userId}`);
+
+  if (!newPw || newPw !== confirm) {
+    if (errEl) { errEl.textContent = newPw ? "As senhas não coincidem." : "Informe a nova senha."; errEl.style.display = "block"; }
+    return;
+  }
+  if (errEl) errEl.style.display = "none";
+
+  setLoading(true);
+  const res = await api("POST", `/users/${userId}/reset-password`, { new_password: newPw });
+  setLoading(false);
+
+  if (!res.ok) {
+    if (errEl) { errEl.textContent = res.error ?? "Erro ao redefinir senha."; errEl.style.display = "block"; }
+    return;
+  }
+  const form = document.getElementById(`reset-pw-form-${userId}`);
+  if (form) form.style.display = "none";
+  await loadUsers();
+}
+
+async function handleChangePassword(e: Event) {
+  e.preventDefault();
+  const current = el<HTMLInputElement>("cp-current").value;
+  const newPw = el<HTMLInputElement>("cp-new").value;
+  const confirm = el<HTMLInputElement>("cp-confirm").value;
+  const errEl = el("cp-error");
+  const successEl = el("cp-success");
+
+  if (newPw !== confirm) {
+    if (errEl) { errEl.textContent = "As senhas não coincidem."; errEl.style.display = "block"; }
+    return;
+  }
+  if (errEl) errEl.style.display = "none";
+
+  setLoading(true);
+  const res = await api("POST", "/users/me/change-password", { current_password: current, new_password: newPw });
+  setLoading(false);
+
+  if (!res.ok) {
+    if (errEl) { errEl.textContent = res.error ?? "Erro ao alterar senha."; errEl.style.display = "block"; }
+    return;
+  }
+  (el("change-password-form") as HTMLFormElement).reset();
+  if (successEl) { successEl.style.display = "block"; setTimeout(() => (successEl.style.display = "none"), 3000); }
+}
+
+async function handleCreateUser(e: Event) {
+  e.preventDefault();
+  const name = el<HTMLInputElement>("new-user-name").value.trim();
+  const email = el<HTMLInputElement>("new-user-email").value.trim();
+  const password = el<HTMLInputElement>("new-user-password").value;
+  const confirm = el<HTMLInputElement>("new-user-confirm").value;
+  const role = el<HTMLSelectElement>("new-user-role").value;
+  const errEl = el("create-user-error");
+
+  if (password !== confirm) {
+    if (errEl) { errEl.textContent = "As senhas não coincidem."; errEl.style.display = "block"; }
+    return;
+  }
+  if (errEl) errEl.style.display = "none";
+
+  setLoading(true);
+  const res = await api<UserRecord>("POST", "/users/", { name, email, password, role });
+  setLoading(false);
+
+  if (!res.ok) {
+    if (errEl) { errEl.textContent = res.error ?? "Erro ao criar usuário."; errEl.style.display = "block"; }
+    return;
+  }
+
+  (el("create-user-form") as HTMLFormElement).reset();
+  await loadUsers();
+}
+
+// ──────────────────────────────────────────────
 // Config
 // ──────────────────────────────────────────────
 
@@ -717,6 +915,7 @@ function switchTab(tab: typeof state.activeTab) {
   if (tab === "importar" && state.process) loadArtifacts();
   if (tab === "comprovacao") { if (state.process) loadDocument(); else renderDocument(); }
   if (tab === "historico") loadAuditLog();
+  if (tab === "usuarios") loadUsers();
   if (tab === "config") {
     const mu = el<HTMLInputElement>("config-middleware-url");
     if (mu) mu.value = state.middlewareUrl;
@@ -738,10 +937,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab as typeof state.activeTab))
   );
 
+  el("btn-close-sidebar")?.addEventListener("click", closeSidebarPanel);
   el("btn-consultar")?.addEventListener("click", consultarProcesso);
   el("login-form")?.addEventListener("submit", handleLogin);
   el("btn-logout")?.addEventListener("click", handleLogout);
   el("import-form")?.addEventListener("submit", handleImportSubmit);
+  el("create-user-form")?.addEventListener("submit", handleCreateUser);
+  el("change-password-form")?.addEventListener("submit", handleChangePassword);
   el("config-form")?.addEventListener("submit", saveConfig);
   el("btn-open-full")?.addEventListener("click", () =>
     window.open(state.frontendUrl, "_blank")

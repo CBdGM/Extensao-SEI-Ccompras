@@ -80,9 +80,9 @@ async def list_process_audit_logs(
     process_id: UUID,
     limit: int = Query(100, le=500),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_admin),
 ):
-    """Return audit trail for a process and all its artifacts/documents. Accessible to any authenticated user."""
+    """Return audit trail for a process and all its artifacts/documents. Admin only."""
     # Collect all entity IDs related to this process
     entity_ids = {str(process_id)}
 

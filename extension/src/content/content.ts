@@ -75,8 +75,10 @@ function injectButton() {
 function openSidebar() {
   if (!sidebarFrame) {
     createSidebar(); // updateSidebarContext() is called by the load event
+  } else {
+    const wrapper = document.getElementById(SIDEBAR_ID);
+    if (wrapper) wrapper.style.display = "";
   }
-  sidebarFrame!.style.display = "block";
   sidebarVisible = true;
   pushSeiBodyRight(true);
   // Only send context if the iframe has already finished loading once.
@@ -85,13 +87,26 @@ function openSidebar() {
 }
 
 function closeSidebar() {
-  if (sidebarFrame) sidebarFrame.style.display = "none";
+  const wrapper = document.getElementById(SIDEBAR_ID);
+  if (wrapper) wrapper.style.display = "none";
   sidebarVisible = false;
   pushSeiBodyRight(false);
 }
 
 function createSidebar() {
-  const sidebarUrl = chrome.runtime.getURL("sidebar.html");
+  let sidebarUrl: string;
+  try {
+    sidebarUrl = chrome.runtime.getURL("sidebar.html");
+  } catch {
+    // Extension was reloaded while this tab was open — context is orphaned.
+    const btn = document.getElementById(BUTTON_ID);
+    if (btn) {
+      btn.title = "Extensão atualizada — recarregue a página (F5)";
+      btn.style.opacity = "0.5";
+    }
+    console.warn("[ComprasSEI] Contexto da extensão inválido. Recarregue a página (F5).");
+    return;
+  }
 
   const wrapper = document.createElement("div");
   wrapper.id = SIDEBAR_ID;
@@ -192,6 +207,16 @@ window.addEventListener("message", async (event) => {
   const { type, payload, requestId } = event.data ?? {};
   if (!type) return;
 
+  // Handle locally — no relay to service worker needed
+  if (type === "CLOSE_SIDEBAR") {
+    closeSidebar();
+    return;
+  }
+  if (type === "REFRESH_SEI_TREE") {
+    reloadSeiTree();
+    return;
+  }
+
   let response: unknown;
   try {
     response = await chrome.runtime.sendMessage({ type, payload });
@@ -214,6 +239,57 @@ window.addEventListener("message", async (event) => {
     // frame gone after context invalidation, ignore
   }
 });
+
+// ──────────────────────────────────────────────
+// SEI tree refresh
+// ──────────────────────────────────────────────
+
+function reloadSeiTree() {
+  const frames = document.querySelectorAll<HTMLIFrameElement>("iframe");
+  // Log all iframes to help diagnose which one is the tree
+  console.debug("[ComprasSEI] iframes na página:", Array.from(frames).map(f => ({
+    name: f.name, src: f.src, id: f.id,
+  })));
+
+  for (const frame of Array.from(frames)) {
+    const src = frame.src || "";
+    const name = (frame.name || frame.id || "").toLowerCase();
+
+    const isTree =
+      src.includes("arvore_visualizar") ||
+      src.includes("arvore_procedimento") ||
+      src.includes("arvore") ||
+      name.includes("arvore") ||
+      name === "ifrarvore" ||
+      name === "ifrtree";
+
+    if (isTree) {
+      console.debug("[ComprasSEI] Recarregando iframe da árvore:", src || name);
+      // src reassignment works even cross-origin (unlike location.reload())
+      frame.src = src;
+      return;
+    }
+  }
+
+  // Fallback: reload all iframes except our own sidebar
+  // (covers SEI layouts where tree iframe has unusual naming)
+  const sidebarWrapper = document.getElementById("compras-sei-sidebar");
+  let reloaded = false;
+  for (const frame of Array.from(frames)) {
+    if (sidebarWrapper?.contains(frame)) continue; // skip our sidebar
+    const src = frame.src || "";
+    if (src) {
+      console.debug("[ComprasSEI] Fallback — recarregando iframe:", src);
+      frame.src = src;
+      reloaded = true;
+      break; // reload just the first non-sidebar iframe (likely the tree)
+    }
+  }
+
+  if (!reloaded) {
+    console.debug("[ComprasSEI] Nenhum iframe encontrado para recarregar");
+  }
+}
 
 // ──────────────────────────────────────────────
 // Bootstrap

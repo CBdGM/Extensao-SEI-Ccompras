@@ -50,6 +50,18 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+def _validate_password_strength(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError("Senha deve ter ao menos 8 caracteres")
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("Senha deve conter ao menos uma letra maiúscula")
+    if not re.search(r"[a-z]", v):
+        raise ValueError("Senha deve conter ao menos uma letra minúscula")
+    if not re.search(r"\d", v):
+        raise ValueError("Senha deve conter ao menos um número")
+    return v
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
@@ -57,12 +69,13 @@ class ChangePasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def password_strength(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Senha deve ter ao menos 8 caracteres")
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("Senha deve conter ao menos uma letra maiúscula")
-        if not re.search(r"[a-z]", v):
-            raise ValueError("Senha deve conter ao menos uma letra minúscula")
-        if not re.search(r"\d", v):
-            raise ValueError("Senha deve conter ao menos um número")
-        return v
+        return _validate_password_strength(v)
+
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)

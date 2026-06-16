@@ -94,19 +94,33 @@ function injectButton() {
 function openSidebar() {
   if (!sidebarFrame) {
     createSidebar();
+  } else {
+    const wrapper = document.getElementById(SIDEBAR_ID);
+    if (wrapper) wrapper.style.display = "";
   }
-  sidebarFrame.style.display = "block";
   sidebarVisible = true;
   pushSeiBodyRight(true);
   if (sidebarLoaded) updateSidebarContext();
 }
 function closeSidebar() {
-  if (sidebarFrame) sidebarFrame.style.display = "none";
+  const wrapper = document.getElementById(SIDEBAR_ID);
+  if (wrapper) wrapper.style.display = "none";
   sidebarVisible = false;
   pushSeiBodyRight(false);
 }
 function createSidebar() {
-  const sidebarUrl = chrome.runtime.getURL("sidebar.html");
+  let sidebarUrl;
+  try {
+    sidebarUrl = chrome.runtime.getURL("sidebar.html");
+  } catch {
+    const btn = document.getElementById(BUTTON_ID);
+    if (btn) {
+      btn.title = "Extensão atualizada — recarregue a página (F5)";
+      btn.style.opacity = "0.5";
+    }
+    console.warn("[ComprasSEI] Contexto da extensão inválido. Recarregue a página (F5).");
+    return;
+  }
   const wrapper = document.createElement("div");
   wrapper.id = SIDEBAR_ID;
   wrapper.className = "compras-sei-sidebar-wrapper";
@@ -170,6 +184,14 @@ window.addEventListener("message", async (event) => {
   if (event.origin !== expectedOrigin) return;
   const { type, payload, requestId } = event.data ?? {};
   if (!type) return;
+  if (type === "CLOSE_SIDEBAR") {
+    closeSidebar();
+    return;
+  }
+  if (type === "REFRESH_SEI_TREE") {
+    reloadSeiTree();
+    return;
+  }
   let response;
   try {
     response = await chrome.runtime.sendMessage({ type, payload });
@@ -189,6 +211,39 @@ window.addEventListener("message", async (event) => {
   } catch {
   }
 });
+function reloadSeiTree() {
+  const frames = document.querySelectorAll("iframe");
+  console.debug("[ComprasSEI] iframes na página:", Array.from(frames).map((f) => ({
+    name: f.name,
+    src: f.src,
+    id: f.id
+  })));
+  for (const frame of Array.from(frames)) {
+    const src = frame.src || "";
+    const name = (frame.name || frame.id || "").toLowerCase();
+    const isTree = src.includes("arvore_visualizar") || src.includes("arvore_procedimento") || src.includes("arvore") || name.includes("arvore") || name === "ifrarvore" || name === "ifrtree";
+    if (isTree) {
+      console.debug("[ComprasSEI] Recarregando iframe da árvore:", src || name);
+      frame.src = src;
+      return;
+    }
+  }
+  const sidebarWrapper = document.getElementById("compras-sei-sidebar");
+  let reloaded = false;
+  for (const frame of Array.from(frames)) {
+    if (sidebarWrapper?.contains(frame)) continue;
+    const src = frame.src || "";
+    if (src) {
+      console.debug("[ComprasSEI] Fallback — recarregando iframe:", src);
+      frame.src = src;
+      reloaded = true;
+      break;
+    }
+  }
+  if (!reloaded) {
+    console.debug("[ComprasSEI] Nenhum iframe encontrado para recarregar");
+  }
+}
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init);
 } else {

@@ -18,6 +18,11 @@
     <div class="header-right">
       <span id="auth-badge" class="auth-badge auth-off">Desconectado</span>
       <button id="btn-logout" class="btn btn-ghost btn-sm" style="display:none">Sair</button>
+      <button id="btn-close-sidebar" class="btn btn-ghost btn-sm btn-icon" title="Fechar painel">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
     </div>
   </header>
 
@@ -53,10 +58,12 @@
     <button class="tab-btn active" data-tab="processo">Processo</button>
     <button class="tab-btn" data-tab="importar">Importar</button>
     <button class="tab-btn" data-tab="comprovacao">Comprovação</button>
-    <button class="tab-btn" data-tab="historico">Histórico</button>
+    <button class="tab-btn" data-tab="historico" id="tab-btn-historico" style="display:none">Histórico</button>
+    <button class="tab-btn" data-tab="usuarios" id="tab-btn-usuarios" style="display:none">Usuários</button>
     <button class="tab-btn" data-tab="config">Config</button>
   </nav>
 
+  <div class="panels-container">
   <!-- ── Tab: Processo ── -->
   <section id="panel-processo" class="tab-panel">
     <div class="panel-actions">
@@ -127,7 +134,34 @@
     </div>
   </section>
 
+  <!-- ── Tab: Usuários (admin only) ── -->
+  <section id="panel-usuarios" class="tab-panel" style="display:none">
+    <h3 class="section-title">Novo Usuário</h3>
+    <form id="create-user-form" class="import-form">
+      <label for="new-user-name">Nome completo</label>
+      <input id="new-user-name" type="text" placeholder="Ex: João Silva" required />
+      <label for="new-user-email">E-mail</label>
+      <input id="new-user-email" type="email" placeholder="usuario@ifpe.edu.br" required />
+      <label for="new-user-password">Senha</label>
+      <input id="new-user-password" type="password" placeholder="Mín. 8 chars, maiúscula, número" required />
+      <label for="new-user-confirm">Confirmar senha</label>
+      <input id="new-user-confirm" type="password" placeholder="Repita a senha" required />
+      <label for="new-user-role">Nível de acesso</label>
+      <select id="new-user-role" class="field-select" required>
+        <option value="user">Usuário</option>
+        <option value="admin">Administrador</option>
+      </select>
+      <div id="create-user-error" class="error-inline" style="display:none"></div>
+      <button type="submit" class="btn btn-primary btn-sm">Criar usuário</button>
+    </form>
+    <h3 class="section-title" style="margin-top:16px">Usuários cadastrados</h3>
+    <div id="users-list">
+      <p class="empty-state">Carregando...</p>
+    </div>
+  </section>
+
   <!-- ── Tab: Config ── -->
+  <!-- (minha senha fica no painel config, acessível a todos) -->
   <section id="panel-config" class="tab-panel" style="display:none">
     <form id="config-form" class="config-form">
       <label for="config-middleware-url">URL do Middleware (API)</label>
@@ -143,10 +177,27 @@
     </form>
     <hr class="divider" />
     <div class="config-section">
+      <h4 class="section-title">Alterar minha senha</h4>
+      <form id="change-password-form" class="import-form" style="margin-top:8px">
+        <label for="cp-current">Senha atual</label>
+        <input id="cp-current" type="password" placeholder="••••••••" required />
+        <label for="cp-new">Nova senha</label>
+        <input id="cp-new" type="password" placeholder="Mín. 8 chars, maiúscula, número" required />
+        <label for="cp-confirm">Confirmar nova senha</label>
+        <input id="cp-confirm" type="password" placeholder="Repita a nova senha" required />
+        <div id="cp-error" class="error-inline" style="display:none"></div>
+        <div id="cp-success" style="display:none; color:var(--color-success); font-size:.8rem; margin-top:4px">Senha alterada!</div>
+        <button type="submit" class="btn btn-primary btn-sm">Salvar nova senha</button>
+      </form>
+    </div>
+    <hr class="divider" />
+    <div class="config-section">
       <p class="config-hint">Abrir o frontend em janela completa:</p>
       <button id="btn-open-full" class="btn btn-secondary btn-sm">Abrir Frontend</button>
     </div>
   </section>
+
+  </div><!-- /panels-container -->
 
   <script src="sidebar.js" type="module"></script>
 </body>
