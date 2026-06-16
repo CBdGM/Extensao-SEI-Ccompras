@@ -114,12 +114,27 @@ core/
 
 ```
 popup.ts              ← Popup do ícone: status de auth, botão para abrir painel
-content.ts            ← Injetado no SEI: detecta processo, cria botão + iframe
+content.ts            ← Injetado no SEI: detecta processo, cria botão + iframe,
+                         trata CLOSE_SIDEBAR e REFRESH_SEI_TREE localmente
 sei-context.ts        ← Extrai numero_processo e id_procedimento da página SEI
 service-worker.ts     ← Proxy de API (único acesso ao JWT e ao middleware)
 sidebar.ts            ← Painel lateral completo (tabs: Processo, Importar,
-                         Comprovação, Histórico, Config)
+                         Comprovação, Histórico*, Usuários*, Config)
+                         * visíveis apenas para administradores
 ```
+
+**Mensagens internas (postMessage / chrome.runtime):**
+
+| Mensagem | Direção | Descrição |
+|----------|---------|-----------|
+| `GET_SETTINGS` | sidebar → SW | Retorna config e status de auth (sem expor JWT) |
+| `API_REQUEST` | sidebar → SW | Proxy de chamada HTTP ao middleware |
+| `GET_HTML` | sidebar → SW | Busca HTML do comprovante (evita expor token) |
+| `SET_TOKEN` / `CLEAR_TOKEN` | sidebar → SW | Salva / remove JWT |
+| `CACHE_PROCESS` / `GET_CACHED_PROCESS` | sidebar → SW | Cache do processo em `chrome.storage.local` |
+| `CLOSE_SIDEBAR` | sidebar → content | Fecha o painel lateral |
+| `REFRESH_SEI_TREE` | sidebar → content | Recarrega o iframe da árvore de documentos do SEI |
+| `OPEN_SIDEBAR` | popup/SW → content | Abre o painel lateral |
 
 **Princípio de segurança da extensão:** o JWT e a URL do middleware vivem **apenas** no service worker. O content script e o sidebar nunca têm acesso direto ao token.
 
@@ -321,11 +336,18 @@ Login
   → Consultar Processo (número SEI)
       → Importar Artefatos (upload PDF: DFD / ETP / TR / Matriz de Riscos)
           → [Enviar Artefatos ao SEI]  — requer SEI_ENABLE_WRITE_OPERATIONS=true
+              → Árvore de documentos do SEI atualiza automaticamente
       → Gerar Comprovante
           → Visualizar HTML / Baixar PDF
           → [Enviar Comprovante ao SEI]
+              → Árvore de documentos do SEI atualiza automaticamente
               → Assinar digitalmente no SEI
 ```
+
+**Carregamento do processo ao reabrir o painel (3 camadas):**
+1. `chrome.storage.local` — cache imediato, sobrevive a reinicializações do service worker
+2. `GET /sei-processes/?numero_processo=` — busca no banco sem SOAP, funciona sem acesso ao SEI
+3. `POST /sei-processes/query` — consulta SOAP completa ao SEI (atualiza dados em background)
 
 **Comportamento do Documento de Comprovação:**
 
@@ -368,8 +390,8 @@ Login
 | `POST` | `/api/v1/documents/{id}/rebuild` | Forçar rebuild | Autenticado |
 | `POST` | `/api/v1/documents/{id}/send-to-sei` | Enviar comprovante ao SEI | Autenticado |
 | `DELETE` | `/api/v1/documents/{id}` | Apagar comprovante | Autenticado |
-| `GET` | `/api/v1/audit/` | Logs de auditoria | Admin |
-| `GET` | `/api/v1/audit/process/{id}` | Auditoria de um processo | Autenticado |
+| `GET` | `/api/v1/audit/` | Logs de auditoria globais | Admin |
+| `GET` | `/api/v1/audit/process/{id}` | Auditoria de um processo | Admin |
 | `GET` | `/api/v1/sei-config/` | Configuração SEI atual | Admin |
 | `POST` | `/api/v1/sei-config/` | Criar configuração SEI | Admin |
 | `PUT` | `/api/v1/sei-config/{id}` | Atualizar configuração SEI | Admin |
@@ -377,7 +399,10 @@ Login
 | `GET` | `/api/v1/sei-config/series` | Listar tipos documentais SEI | Admin |
 | `GET` | `/api/v1/users/` | Listar usuários | Admin |
 | `POST` | `/api/v1/users/` | Criar usuário | Admin |
-| `PUT` | `/api/v1/users/{id}` | Atualizar usuário | Admin |
+| `GET` | `/api/v1/users/me` | Dados do usuário logado | Autenticado |
+| `PATCH` | `/api/v1/users/{id}` | Atualizar usuário (nome, role, ativo) | Admin |
+| `POST` | `/api/v1/users/{id}/reset-password` | Redefinir senha de outro usuário | Admin |
+| `POST` | `/api/v1/users/me/change-password` | Alterar própria senha | Autenticado |
 
 Documentação interativa (apenas com `DEBUG=true`): `http://localhost:8000/api/docs`
 
